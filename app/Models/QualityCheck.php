@@ -11,7 +11,7 @@ class QualityCheck extends Model
 
     protected $fillable = [
         'lot_number',
-        'parameter_id',
+        'parameter_id', // This now refers to agreement_parameter_id
         'observed_value',
         'status'
     ];
@@ -23,6 +23,6 @@ class QualityCheck extends Model
 
     public function parameter()
     {
-        return $this->belongsTo(Parameter::class);
+        return $this->belongsTo(AgreementParameter::class, 'parameter_id'); // Updated to AgreementParameter
     }
 }
