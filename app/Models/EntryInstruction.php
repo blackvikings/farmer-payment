@@ -10,12 +10,14 @@ class EntryInstruction extends Model
     use HasFactory;
 
     protected $fillable = [
-        'lot_number',
+        'frn_id',
+        'instruction_type',
         'status',
+        'details',
     ];
 
     public function frn()
     {
-        return $this->belongsTo(Frn::class, 'lot_number', 'lot_number');
+        return $this->belongsTo(Frn::class);
     }
 }

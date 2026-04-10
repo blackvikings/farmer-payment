@@ -40,7 +40,8 @@
                 @forelse($parameters as $index => $parameter)
                     <div class="form-group row">
                         <label for="param_{{ $parameter->id }}" class="col-sm-3 col-form-label">
-                            {{ $parameter->name }}
+                            {{ $parameter->name }} <br>
+                            <small class="text-muted">Expected Value: {{ $parameter->value }}</small>
                         </label>
                         <div class="col-sm-9">
                             <input type="hidden" name="checks[{{ $index }}][parameter_id]" value="{{ $parameter->id }}">

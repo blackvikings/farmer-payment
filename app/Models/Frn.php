@@ -26,4 +26,9 @@ class Frn extends Model
     {
         return $this->belongsTo(Lot::class, 'lot_number', 'lot_number');
     }
+
+    public function entryInstruction()
+    {
+        return $this->hasOne(EntryInstruction::class, 'frn_id', 'lot_number');
+    }
 }

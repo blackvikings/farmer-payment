@@ -65,7 +65,6 @@ class FrnController extends Controller
             // FR3 Validation: Ensure all required fields are present and unique where necessary.
             $validated = $request->validate([
                 'lot_number' => 'required|string|exists:lots,lot_number|unique:frns,lot_number',
-                'frn_number' => 'required|string|unique:frns,frn_number',
                 'arrival_date' => 'required|date',
                 'gross_weight' => 'required|numeric|min:0.01',
                 'vehicle_number' => 'nullable|string',
@@ -73,9 +72,13 @@ class FrnController extends Controller
 
             // Re-verify that the lot is still in an 'accepted' state before creating the FRN.
             $lot = Lot::where('lot_number', $validated['lot_number'])->first();
+
             if ($lot->status !== 'accepted') {
                 return redirect()->back()->with('error', 'Cannot create FRN for a lot that is not accepted.')->withInput();
             }
+
+            // Auto-generate a unique FRN number
+            $validated['frn_number'] = 'FRN-' . now()->timestamp;
 
             // Create the FRN record. The associated observer will handle automated post-creation tasks.
             Frn::create($validated);

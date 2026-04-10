@@ -39,11 +39,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="frn_number">FRN Number * (Unique)</label>
-                    <input type="text" name="frn_number" class="form-control" id="frn_number" placeholder="Enter FRN number" value="{{ old('frn_number') }}" required>
-                </div>
-
-                <div class="form-group">
                     <label for="arrival_date">Arrival Date *</label>
                     <input type="date" name="arrival_date" class="form-control" id="arrival_date" value="{{ old('arrival_date', date('Y-m-d')) }}" required>
                 </div>

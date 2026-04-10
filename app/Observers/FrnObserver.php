@@ -6,6 +6,7 @@ use App\Models\Frn;
 use App\Models\Lot;
 use App\Models\LossRule;
 use App\Models\DebitNote;
+use App\Models\EntryInstruction; // Import the EntryInstruction model
 
 class FrnObserver
 {
@@ -17,6 +18,14 @@ class FrnObserver
      */
     public function created(Frn $frn)
     {
+        // Auto-create the associated Entry Instruction
+        EntryInstruction::create([
+            'frn_id' => $frn->id,
+            'instruction_type' => 'standard_unload', // Default instruction type
+            'status' => 'pending', // Default status
+            'details' => 'Standard unloading procedure for lot #' . $frn->lot_number,
+        ]);
+
         $this->calculateProcessLoss($frn);
     }
 

@@ -42,11 +42,8 @@
                             <td>{{ $frn->gross_weight }}</td>
                             <td>{{ $frn->vehicle_number ?? 'N/A' }}</td>
                             <td>
-                                @php
-                                    $instruction = \App\Models\EntryInstruction::where('lot_number', $frn->lot_number)->first();
-                                @endphp
-                                @if($instruction)
-                                    <span class="badge badge-info">{{ $instruction->status }}</span>
+                                @if($frn->entryInstruction)
+                                    <span class="badge badge-info">{{ $frn->entryInstruction->status }}</span>
                                 @else
                                     <span class="badge badge-secondary">Not Created</span>
                                 @endif
