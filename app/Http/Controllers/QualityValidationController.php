@@ -3,9 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lot;
-use App\Models\LossRule;
-use App\Models\DebitNote;
-use App\Models\ParameterStandard;
 use App\Models\QualityCheck;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,9 +35,8 @@ class QualityValidationController extends Controller
     /**
      * Show the dynamic form for performing a quality check on a specific lot.
      *
-     * This method retrieves the specified lot and all active parameter standards.
-     * The standards are passed to the view to dynamically generate the QC form,
-     * displaying each parameter alongside its acceptable value ranges.
+     * This method retrieves the specified lot and its associated agreement parameters.
+     * The parameters are passed to the view to dynamically generate the QC form.
      *
      * @param string $lotNumber The unique identifier for the lot to be checked.
      * @return \Illuminate\View\View
@@ -48,7 +44,7 @@ class QualityValidationController extends Controller
     public function checkQuality($lotNumber)
     {
         $lot = Lot::where('lot_number', $lotNumber)->firstOrFail();
-        $parameters = ParameterStandard::with('parameter')->get();
+        $parameters = $lot->agreement->parameters;
         return view('quality.check', compact('lot', 'parameters'));
     }
 
@@ -72,7 +68,7 @@ class QualityValidationController extends Controller
             $validated = $request->validate([
                 'final_quantity' => 'required|numeric|min:0',
                 'checks' => 'required|array',
-                'checks.*.parameter_id' => 'required|exists:parameters,id',
+                'checks.*.parameter_id' => 'required|exists:agreement_parameters,id', // Validate against agreement_parameters table
                 'checks.*.observed_value' => 'required|numeric',
             ]);
 
@@ -86,29 +82,34 @@ class QualityValidationController extends Controller
 
             DB::transaction(function () use ($lot, $validated, &$overallStatus) {
                 foreach ($validated['checks'] as $checkData) {
-                    $standard = ParameterStandard::where('parameter_id', $checkData['parameter_id'])->firstOrFail();
-                    $value = $checkData['observed_value'];
+                    // Fetch the specific AgreementParameter for this check
+                    $agreementParameter = $lot->agreement->parameters()->findOrFail($checkData['parameter_id']);
+                    $observedValue = $checkData['observed_value'];
+                    $targetValue = (float) $agreementParameter->value; // Cast to float for numeric comparison
+
                     $checkStatus = 'Rejected'; // Default to rejected.
 
-                    // Determine the status of the individual parameter check.
-                    if ($this->isValueInRange($value, $standard->min_accepted, $standard->max_accepted)) {
+                    // Simple comparison logic based on a single target value
+                    $tolerance = 0.05; // 5% tolerance for 'Conditional'
+                    $minConditional = $targetValue * (1 - $tolerance);
+                    $maxConditional = $targetValue * (1 + $tolerance);
+
+                    if ($observedValue == $targetValue) {
                         $checkStatus = 'Accepted';
-                    } elseif ($this->isValueInRange($value, $standard->min_conditional, $standard->max_conditional)) {
+                    } elseif ($observedValue >= $minConditional && $observedValue <= $maxConditional) {
                         $checkStatus = 'Conditional';
-                        // If a check is conditional, the overall status cannot be fully accepted.
-                        if ($overallStatus !== 'Rejected') {
+                        if ($overallStatus !== 'Rejected') { // Don't downgrade from Rejected
                             $overallStatus = 'Conditional';
                         }
                     } else {
-                        // If any check is rejected, the entire lot is rejected.
                         $overallStatus = 'Rejected';
                     }
 
                     // Create a record for each individual quality check.
                     QualityCheck::create([
                         'lot_number' => $lot->lot_number,
-                        'parameter_id' => $checkData['parameter_id'],
-                        'observed_value' => $value,
+                        'parameter_id' => $agreementParameter->id, // Store the agreement_parameter_id
+                        'observed_value' => $observedValue,
                         'status' => $checkStatus,
                     ]);
                 }
@@ -116,6 +117,7 @@ class QualityValidationController extends Controller
                 // Update the lot with the final QC status and payment block flag.
                 $lot->qc_status = $overallStatus;
                 $lot->payment_blocked = ($overallStatus === 'Rejected');
+                $lot->final_quantity = $validated['final_quantity']; // Update final quantity
                 $lot->save();
             });
 
@@ -124,23 +126,5 @@ class QualityValidationController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'An error occurred: ' . $e->getMessage())->withInput();
         }
-    }
-
-    /**
-     * A private helper method to determine if a given value falls within a specified range.
-     * The range is inclusive. Null values for min or max are treated as open-ended bounds.
-     *
-     * @param float $value The observed value to check.
-     * @param float|null $min The minimum acceptable value (inclusive).
-     * @param float|null $max The maximum acceptable value (inclusive).
-     * @return bool True if the value is within the range, false otherwise.
-     */
-    private function isValueInRange($value, $min, $max): bool
-    {
-        if ($min !== null && $value < $min) return false;
-        if ($max !== null && $value > $max) return false;
-        // A range must have at least one bound.
-        if ($min === null && $max === null) return false;
-        return true;
     }
 }

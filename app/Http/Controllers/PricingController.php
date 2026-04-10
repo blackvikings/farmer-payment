@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lot;
-use App\Models\Rate;
 use App\Models\DebitNote;
-use App\Models\BonusRule;
 use App\Models\Ledger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,11 +24,12 @@ class PricingController extends Controller
      * Calculate the detailed pricing for a given lot.
      *
      * This is the core of the pricing engine. It performs a sequence of calculations:
-     * 1.  **Base Amount**: Calculated from the lot's final quantity and the active base rate.
-     * 2.  **Quality Deduction**: Applies deductions based on the lot's QC status (e.g., 'conditional').
-     * 3.  **Bonus Input**: Adds any applicable bonuses based on active bonus rules.
+     * 1.  **Base Amount**: Calculated from the lot's final quantity and the agreement's rate.
+     * 2.  **Quality Deduction**: Applies deductions based on the lot's QC status and agreement parameters.
+     * 3.  **Bonus Input**: Adds any applicable bonuses based on the agreement's bonus.
      * 4.  **Debit Recovery**: Recovers any approved debit notes associated with the lot (e.g., for process loss).
-     * 5.  **Ledger Adjustments**: Considers the farmer's previous balance (advances or dues) for final adjustment.
+     * 5.  **Loss Rule Application**: Applies any loss rules from the agreement.
+     * 6.  **Ledger Adjustments**: Considers the farmer's previous balance (advances or dues) for final adjustment.
      *
      * The final calculated values are then saved to the lot record.
      *
@@ -45,46 +44,53 @@ class PricingController extends Controller
             return redirect()->back()->with('error', 'Pricing is already approved and locked for this lot.');
         }
 
+        $agreement = $lot->agreement()->with(['lossRules', 'parameters'])->first();
+
         // --- 1. Base Amount Calculation ---
-        $baseRate = Rate::where('is_active', true)->first();
         $quantity = $lot->final_quantity ?? $lot->quantity;
-        $basePrice = $baseRate ? $baseRate->base_price : 0;
+        $basePrice = $agreement->rate ?? 0;
         $baseAmount = $quantity * $basePrice;
 
-        // --- 2. Quality Deduction ---
-        // This is placeholder logic. A real implementation would have a dedicated deduction rule engine.
+        // --- 2. Quality Deduction (based on parameters) ---
         $qualityDeduction = 0;
-        if ($lot->qc_status === 'conditional') {
-             $qualityDeduction = $baseAmount * 0.05; // Example: 5% deduction
+        foreach ($agreement->parameters as $parameter) {
+            // Placeholder logic for parameter-based deductions
+            if ($lot->qc_status === 'conditional' && $parameter->name === 'moisture_content' && $lot->moisture_content > $parameter->value) {
+                $qualityDeduction += $baseAmount * 0.02; // Example: 2% deduction for high moisture
+            }
         }
 
         // --- 3. Bonus & Compensation Input ---
-        $bonusAmount = 0;
-        $activeBonus = BonusRule::where('is_active', true)->first();
-        if ($activeBonus) {
-            // This is a simplified bonus calculation. A full implementation would evaluate the rule's condition.
-            $bonusAmount = $quantity * $activeBonus->bonus_amount;
-        }
+        $bonusAmount = $agreement->bonus ?? 0;
         $compensationAmount = $request->input('compensation_amount', 0);
 
         // --- 4. Debit Recovery ---
         $debitRecovery = 0;
         if ($lot->debit_note_id) {
             $debitNote = DebitNote::find($lot->debit_note_id);
-            // Only recover the amount if the debit note has been approved.
             if ($debitNote && $debitNote->is_approved) {
                 $debitRecovery = $debitNote->amount;
             }
         }
 
-        // --- 5. Ledger Adjustments & Final Calculation ---
+        // --- 5. Loss Rule Application ---
+        $lossDeduction = 0;
+        foreach ($agreement->lossRules as $rule) {
+            // Placeholder logic for loss rule application
+            // Example: if loss rule is "weight_loss" and value is "5", deduct 5%
+            if (strpos(strtolower($rule->name), 'weight') !== false) {
+                $lossDeduction += $baseAmount * ($rule->value / 100);
+            }
+        }
+
+        // --- 6. Ledger Adjustments & Final Calculation ---
         $grossPayable = $baseAmount + $bonusAmount + $compensationAmount;
 
-        $farmerId = $lot->agreement->farmer_id;
+        $farmerId = $agreement->farmer_id;
         $previousBalance = Ledger::where('entity_type', 'farmer')->where('entity_id', $farmerId)->sum('amount');
         $advanceRecovery = $previousBalance < 0 ? abs($previousBalance) : 0;
 
-        $netPayable = $grossPayable - $qualityDeduction - $debitRecovery - $advanceRecovery;
+        $netPayable = $grossPayable - $qualityDeduction - $lossDeduction - $debitRecovery - $advanceRecovery;
 
         // --- Save all calculated values to the lot ---
         $lot->update([
@@ -115,7 +121,7 @@ class PricingController extends Controller
         // Lock the pricing data by setting the approval flag and recording the user and timestamp.
         $lot->update([
             'pricing_approved' => true,
-            'approved_by' => Auth::id() ?? 1, // Use authenticated user or a fallback.
+            'approved_by' => Auth::check() ? Auth::id() : null, // Use authenticated user's ID, or null if not logged in.
             'approved_at' => now(),
         ]);
 

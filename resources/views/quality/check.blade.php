@@ -37,19 +37,18 @@
                 <h4 class="mt-4">Quality Parameters</h4>
                 <hr>
 
-                @forelse($parameters as $index => $standard)
+                @forelse($parameters as $index => $parameter)
                     <div class="form-group row">
-                        <label for="param_{{ $standard->parameter_id }}" class="col-sm-3 col-form-label">
-                            {{ $standard->parameter->name }} <br>
-                            <small class="text-muted">Accepted Range: {{ $standard->min_accepted }} - {{ $standard->max_accepted }}</small>
+                        <label for="param_{{ $parameter->id }}" class="col-sm-3 col-form-label">
+                            {{ $parameter->name }}
                         </label>
                         <div class="col-sm-9">
-                            <input type="hidden" name="checks[{{ $index }}][parameter_id]" value="{{ $standard->parameter_id }}">
-                            <input type="number" step="0.01" class="form-control" name="checks[{{ $index }}][observed_value]" id="param_{{ $standard->parameter_id }}" placeholder="Enter observed value for {{ $standard->parameter->name }}" required>
+                            <input type="hidden" name="checks[{{ $index }}][parameter_id]" value="{{ $parameter->id }}">
+                            <input type="number" step="0.01" class="form-control" name="checks[{{ $index }}][observed_value]" id="param_{{ $parameter->id }}" placeholder="Enter observed value for {{ $parameter->name }}" required>
                         </div>
                     </div>
                 @empty
-                    <p class="text-muted">No parameter standards defined. Please configure the Parameter Master first.</p>
+                    <p class="text-muted">No parameters defined for this agreement.</p>
                 @endforelse
             </div>
 

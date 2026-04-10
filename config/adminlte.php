@@ -335,11 +335,6 @@ return [
             'url' => 'agreements',
             'icon' => 'fas fa-fw fa-file-contract',
         ],
-        [
-            'text' => 'Parameters',
-            'url' => 'parameters',
-            'icon' => 'fas fa-fw fa-wrench'
-        ],
         ['header' => 'OPERATIONS & FINANCE'],
         [
             'text' => 'Lots & Pricing',
@@ -350,21 +345,6 @@ return [
             'text' => 'FRN Processing',
             'url' => 'frns',
             'icon' => 'fas fa-fw fa-truck',
-        ],
-        [
-            'text' => 'Rates',
-            'url' => 'rates',
-            'icon' => 'fas fa-fw fa-dollar-sign',
-        ],
-        [
-            'text' => 'Bonus Rules',
-            'url' => 'bonus-rules',
-            'icon' => 'fas fa-fw fa-star',
-        ],
-        [
-            'text' => 'Loss Rules',
-            'url' => 'loss-rules',
-            'icon' => 'fas fa-fw fa-exclamation-triangle',
         ],
         ['header' => 'QUALITY VALIDATION'],
         [

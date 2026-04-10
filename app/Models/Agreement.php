@@ -13,7 +13,8 @@ class Agreement extends Model
         'farmer_id',
         'start_date',
         'end_date',
-        'terms'
+        'rate', // New field
+        'bonus', // New field
     ];
 
     protected $casts = [
@@ -24,5 +25,15 @@ class Agreement extends Model
     public function farmer()
     {
         return $this->belongsTo(Farmer::class);
+    }
+
+    public function lossRules()
+    {
+        return $this->hasMany(AgreementLossRule::class);
+    }
+
+    public function parameters()
+    {
+        return $this->hasMany(AgreementParameter::class);
     }
 }

@@ -26,29 +26,6 @@ Route::get('/agreements', [MasterManagementController::class, 'indexAgreements']
 Route::get('/agreements/create', [MasterManagementController::class, 'createAgreement'])->name('agreements.create');
 Route::post('/agreements', [MasterManagementController::class, 'storeAgreement'])->name('agreements.store');
 
-//Parameters
-Route::get('/parameters', [MasterManagementController::class, 'indexParameters'])->name('parameters.index');
-Route::get('/parameters/create', [MasterManagementController::class, 'createParameter'])->name('parameters.create');
-Route::post('/parameters', [MasterManagementController::class, 'storeParameter'])->name('parameters.store');
-
-// Rates
-Route::get('/rates', [MasterManagementController::class, 'indexRates'])->name('rates.index');
-Route::get('/rates/create', [MasterManagementController::class, 'createRate'])->name('rates.create');
-Route::post('/rates', [MasterManagementController::class, 'storeRateWeb'])->name('rates.store');
-Route::get('/rates/{id}/edit', [MasterManagementController::class, 'editRate'])->name('rates.edit');
-Route::post('/rates/{id}', [MasterManagementController::class, 'updateRateVersionWeb'])->name('rates.update');
-
-// Bonus Rules
-Route::get('/bonus-rules', [MasterManagementController::class, 'indexBonusRules'])->name('bonus-rules.index');
-Route::get('/bonus-rules/create', [MasterManagementController::class, 'createBonusRule'])->name('bonus-rules.create');
-Route::post('/bonus-rules', [MasterManagementController::class, 'storeBonusRuleWeb'])->name('bonus-rules.store');
-
-// Loss Rules
-Route::get('/loss-rules', [MasterManagementController::class, 'indexLossRules'])->name('loss-rules.index');
-Route::get('/loss-rules/create', [MasterManagementController::class, 'createLossRule'])->name('loss-rules.create');
-Route::post('/loss-rules', [MasterManagementController::class, 'storeLossRuleWeb'])->name('loss-rules.store');
-
-
 // FR2: Lots (Agreement Validation)
 Route::get('/lots', [LotController::class, 'indexLots'])->name('lots.index');
 Route::get('/lots/create', [LotController::class, 'createLot'])->name('lots.create');
