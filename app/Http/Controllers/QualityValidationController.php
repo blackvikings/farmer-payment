@@ -4,17 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Lot;
 use App\Models\QualityCheck;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 /**
  * Class QualityValidationController
- * @package App\Http\Controllers
- *
- * This controller is responsible for all logic related to FR-5 (Quality Validation).
- * It provides the functionality for quality inspectors to input observed values for various
- * parameters, compares them against predefined standards, and classifies the lot's overall
- * quality status. It also handles automatic payment blocking for rejected lots.
  */
 class QualityValidationController extends Controller
 {
@@ -24,11 +20,12 @@ class QualityValidationController extends Controller
      * This method fetches all lots that have been 'accepted' during the initial reception
      * phase, as these are the only ones eligible for quality control.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function indexQuality()
     {
         $lots = Lot::where('status', 'accepted')->with('agreement.farmer')->get();
+
         return view('quality.index', compact('lots'));
     }
 
@@ -38,13 +35,14 @@ class QualityValidationController extends Controller
      * This method retrieves the specified lot and its associated agreement parameters.
      * The parameters are passed to the view to dynamically generate the QC form.
      *
-     * @param string $lotNumber The unique identifier for the lot to be checked.
-     * @return \Illuminate\View\View
+     * @param  string  $lotNumber  The unique identifier for the lot to be checked.
+     * @return View
      */
     public function checkQuality($lotNumber)
     {
         $lot = Lot::where('lot_number', $lotNumber)->firstOrFail();
         $parameters = $lot->agreement->parameters;
+
         return view('quality.check', compact('lot', 'parameters'));
     }
 
@@ -58,9 +56,9 @@ class QualityValidationController extends Controller
      * Based on the individual checks, it calculates an overall QC status for the lot.
      * If any check is 'Rejected', the entire lot is rejected, and payment is automatically blocked.
      *
-     * @param Request $request The incoming HTTP request containing the QC data.
-     * @param string $lotNumber The lot number being validated.
-     * @return \Illuminate\Http\RedirectResponse
+     * @param  Request  $request  The incoming HTTP request containing the QC data.
+     * @param  string  $lotNumber  The lot number being validated.
+     * @return RedirectResponse
      */
     public function submitQualityChecksWeb(Request $request, $lotNumber)
     {
@@ -108,7 +106,7 @@ class QualityValidationController extends Controller
                     // Create a record for each individual quality check.
                     QualityCheck::create([
                         'lot_number' => $lot->lot_number,
-                        'parameter_id' => $agreementParameter->id, // Store the agreement_parameter_id
+                        'agreement_parameter_id' => $agreementParameter->id,
                         'observed_value' => $observedValue,
                         'status' => $checkStatus,
                     ]);
@@ -124,7 +122,7 @@ class QualityValidationController extends Controller
             return redirect()->route('quality.index')->with('success', "QC for Lot #{$lotNumber} completed. Final Status: {$overallStatus}");
 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'An error occurred: ' . $e->getMessage())->withInput();
+            return redirect()->back()->with('error', 'An error occurred: '.$e->getMessage())->withInput();
         }
     }
 }

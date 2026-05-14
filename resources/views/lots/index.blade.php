@@ -62,7 +62,7 @@
                                 @endif
                             </td>
                             <td>
-                                @if($lot->status == 'accepted' && $lot->qc_status && !$lot->pricing_approved && !$lot->payment_blocked)
+                                @if($lot->status == 'accepted' && in_array($lot->qc_status, ['Accepted', 'Conditional']) && !$lot->pricing_approved && !$lot->payment_blocked)
                                     <form action="{{ route('lots.calculate-pricing', $lot) }}" method="POST" style="display:inline;">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-secondary">Calculate</button>

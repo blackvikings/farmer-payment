@@ -1,50 +1,66 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MasterManagementController;
-use App\Http\Controllers\QualityValidationController;
-use App\Http\Controllers\LotController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FrnController;
+use App\Http\Controllers\LotController;
+use App\Http\Controllers\MasterManagementController;
 use App\Http\Controllers\PricingController;
+use App\Http\Controllers\QualityValidationController;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('home');
+    return Auth::check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
-// FR1: Master Management
-Route::get('/farmers', [MasterManagementController::class, 'indexFarmers'])->name('farmers.index');
-Route::get('/farmers/create', [MasterManagementController::class, 'createFarmer'])->name('farmers.create');
-Route::post('/farmers', [MasterManagementController::class, 'storeFarmer'])->name('farmers.store');
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login'])->name('login.store');
+});
 
+Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
-Route::get('/organizers', [MasterManagementController::class, 'indexOrganizers'])->name('organizers.index');
-Route::get('/organizers/create', [MasterManagementController::class, 'createOrganizer'])->name('organizers.create');
-Route::post('/organizers', [MasterManagementController::class, 'storeOrganizer'])->name('organizers.store');
+Route::middleware('auth')->group(function () {
+    Route::get('/dashboard', function () {
+        return view('home');
+    })->name('dashboard');
 
-//Agreements
-Route::get('/agreements', [MasterManagementController::class, 'indexAgreements'])->name('agreements.index');
-Route::get('/agreements/create', [MasterManagementController::class, 'createAgreement'])->name('agreements.create');
-Route::post('/agreements', [MasterManagementController::class, 'storeAgreement'])->name('agreements.store');
+    // FR1: Master Management
+    Route::get('/farmers', [MasterManagementController::class, 'indexFarmers'])->name('farmers.index');
+    Route::get('/farmers/create', [MasterManagementController::class, 'createFarmer'])->name('farmers.create');
+    Route::post('/farmers', [MasterManagementController::class, 'storeFarmer'])->name('farmers.store');
 
-// FR2: Lots (Agreement Validation)
-Route::get('/lots', [LotController::class, 'indexLots'])->name('lots.index');
-Route::get('/lots/create', [LotController::class, 'createLot'])->name('lots.create');
-Route::post('/lots', [LotController::class, 'storeWeb'])->name('lots.store');
+    Route::get('/organizers', [MasterManagementController::class, 'indexOrganizers'])->name('organizers.index');
+    Route::get('/organizers/create', [MasterManagementController::class, 'createOrganizer'])->name('organizers.create');
+    Route::post('/organizers', [MasterManagementController::class, 'storeOrganizer'])->name('organizers.store');
 
-// FR3 & FR4: FRN Processing (Arrival)
-Route::get('/frns', [FrnController::class, 'indexFrns'])->name('frns.index');
-Route::get('/frns/create', [FrnController::class, 'createFrn'])->name('frns.create');
-Route::post('/frns', [FrnController::class, 'storeWeb'])->name('frns.store');
+    // Agreements
+    Route::get('/agreements', [MasterManagementController::class, 'indexAgreements'])->name('agreements.index');
+    Route::get('/agreements/create', [MasterManagementController::class, 'createAgreement'])->name('agreements.create');
+    Route::post('/agreements', [MasterManagementController::class, 'storeAgreement'])->name('agreements.store');
 
-// FR5: Quality Validation Routes
-Route::get('/quality-validation', [QualityValidationController::class, 'indexQuality'])->name('quality.index');
-Route::get('/quality-validation/{lotNumber}/check', [QualityValidationController::class, 'checkQuality'])->name('quality.check');
-Route::post('/quality-validation/{lotNumber}/submit', [QualityValidationController::class, 'submitQualityChecksWeb'])->name('quality.submit');
+    // FR2: Lots (Agreement Validation)
+    Route::get('/lots', [LotController::class, 'indexLots'])->name('lots.index');
+    Route::get('/lots/create', [LotController::class, 'createLot'])->name('lots.create');
+    Route::post('/lots', [LotController::class, 'storeWeb'])->name('lots.store');
 
-// Debit Note Approval
-Route::post('/debit-note/{debitNote}/approve', [FrnController::class, 'approveDebitNote'])->name('debit-note.approve');
+    // FR3 & FR4: FRN Processing (Arrival)
+    Route::get('/frns', [FrnController::class, 'indexFrns'])->name('frns.index');
+    Route::get('/frns/create', [FrnController::class, 'createFrn'])->name('frns.create');
+    Route::post('/frns', [FrnController::class, 'storeWeb'])->name('frns.store');
 
-// Pricing Engine & Payment Processing
-Route::post('/lots/{lot}/calculate-pricing', [PricingController::class, 'calculatePricing'])->name('lots.calculate-pricing');
-Route::post('/lots/{lot}/approve-pricing', [PricingController::class, 'approvePricing'])->name('lots.approve-pricing');
-Route::post('/lots/{lot}/process-payment', [PricingController::class, 'processPayment'])->name('lots.process-payment');
+    // FR5: Quality Validation Routes
+    Route::get('/quality-validation', [QualityValidationController::class, 'indexQuality'])->name('quality.index');
+    Route::get('/quality-validation/{lotNumber}/check', [QualityValidationController::class, 'checkQuality'])->name('quality.check');
+    Route::post('/quality-validation/{lotNumber}/submit', [QualityValidationController::class, 'submitQualityChecksWeb'])->name('quality.submit');
+
+    // Debit Note Approval
+    Route::post('/debit-note/{debitNote}/approve', [FrnController::class, 'approveDebitNote'])->name('debit-note.approve');
+
+    // Pricing Engine & Payment Processing
+    Route::post('/lots/{lot}/calculate-pricing', [PricingController::class, 'calculatePricing'])->name('lots.calculate-pricing');
+    Route::post('/lots/{lot}/approve-pricing', [PricingController::class, 'approvePricing'])->name('lots.approve-pricing');
+    Route::post('/lots/{lot}/process-payment', [PricingController::class, 'processPayment'])->name('lots.process-payment');
+});

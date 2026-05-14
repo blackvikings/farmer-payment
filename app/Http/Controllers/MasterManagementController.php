@@ -2,28 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Agreement;
 use App\Models\Farmer;
 use App\Models\Organizer;
-use App\Models\Agreement;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class MasterManagementController extends Controller
 {
     // ... (Organizer and Farmer methods)
     /**
      * Displays a list of all organizers.
-     * @return \Illuminate\View\View
+     *
+     * @return View
      */
     public function indexOrganizers()
     {
         $organizers = Organizer::all();
+
         return view('organizers.index', compact('organizers'));
     }
 
     /**
      * Shows the form for creating a new organizer.
-     * @return \Illuminate\View\View
+     *
+     * @return View
      */
     public function createOrganizer()
     {
@@ -32,8 +36,8 @@ class MasterManagementController extends Controller
 
     /**
      * Stores a newly created organizer in the database.
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     *
+     * @return RedirectResponse
      */
     public function storeOrganizer(Request $request)
     {
@@ -42,6 +46,7 @@ class MasterManagementController extends Controller
             'contact_info' => 'nullable|string',
         ]);
         Organizer::create($validated);
+
         return redirect()->route('organizers.index')->with('success', 'Organizer created successfully.');
     }
 
@@ -49,28 +54,32 @@ class MasterManagementController extends Controller
 
     /**
      * Displays a list of all farmers, with their associated organizer.
-     * @return \Illuminate\View\View
+     *
+     * @return View
      */
     public function indexFarmers()
     {
         $farmers = Farmer::with('organizer')->get();
+
         return view('farmers.index', compact('farmers'));
     }
 
     /**
      * Shows the form for creating a new farmer.
-     * @return \Illuminate\View\View
+     *
+     * @return View
      */
     public function createFarmer()
     {
         $organizers = Organizer::all();
+
         return view('farmers.create', compact('organizers'));
     }
 
     /**
      * Stores a newly created farmer in the database.
-     * @param Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     *
+     * @return RedirectResponse
      */
     public function storeFarmer(Request $request)
     {
@@ -81,6 +90,7 @@ class MasterManagementController extends Controller
             'address' => 'required|string',
         ]);
         Farmer::create($validated);
+
         return redirect()->route('farmers.index')->with('success', 'Farmer created successfully.');
     }
     // --- Agreement Management ---
@@ -88,12 +98,14 @@ class MasterManagementController extends Controller
     public function indexAgreements()
     {
         $agreements = Agreement::with(['farmer'])->get();
+
         return view('agreements.index', compact('agreements'));
     }
 
     public function createAgreement()
     {
         $farmers = Farmer::pluck('name', 'id');
+
         return view('agreements.create', compact('farmers'));
     }
 
@@ -103,10 +115,14 @@ class MasterManagementController extends Controller
             'farmer_id' => 'required|exists:farmers,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'rate' => 'nullable|string',
-            'bonus' => 'nullable|string',
+            'rate' => 'required|numeric|min:0',
+            'bonus' => 'nullable|numeric|min:0',
             'loss_rules' => 'nullable|array',
+            'loss_rules.*.name' => 'nullable|string|max:255',
+            'loss_rules.*.value' => 'nullable|numeric|min:0',
             'parameters' => 'nullable|array',
+            'parameters.*.name' => 'nullable|string|max:255',
+            'parameters.*.value' => 'nullable|numeric',
         ]);
 
         $agreement = Agreement::create($validated);
@@ -114,8 +130,11 @@ class MasterManagementController extends Controller
         if (isset($validated['loss_rules'])) {
             foreach ($validated['loss_rules'] as $rule) {
                 // Only create the rule if a name is provided
-                if (!empty($rule['name'])) {
-                    $agreement->lossRules()->create($rule);
+                if (! empty($rule['name'])) {
+                    $agreement->lossRules()->create([
+                        'name' => $rule['name'],
+                        'value' => $rule['value'] ?? 0,
+                    ]);
                 }
             }
         }
@@ -123,8 +142,11 @@ class MasterManagementController extends Controller
         if (isset($validated['parameters'])) {
             foreach ($validated['parameters'] as $parameter) {
                 // Only create the parameter if a name is provided
-                if (!empty($parameter['name'])) {
-                    $agreement->parameters()->create($parameter);
+                if (! empty($parameter['name'])) {
+                    $agreement->parameters()->create([
+                        'name' => $parameter['name'],
+                        'value' => $parameter['value'] ?? 0,
+                    ]);
                 }
             }
         }

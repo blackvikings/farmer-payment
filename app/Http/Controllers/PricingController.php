@@ -2,21 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Lot;
 use App\Models\DebitNote;
 use App\Models\Ledger;
+use App\Models\Lot;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Class PricingController
- * @package App\Http\Controllers
- *
- * This controller is dedicated to the financial heart of the application: the pricing engine.
- * It is responsible for calculating the final payable amount for each lot by orchestrating
- * a series of financial calculations, including base price, deductions, bonuses, and recoveries.
- * It also handles the approval workflow and the final payment processing.
  */
 class PricingController extends Controller
 {
@@ -33,36 +28,49 @@ class PricingController extends Controller
      *
      * The final calculated values are then saved to the lot record.
      *
-     * @param Lot $lot The lot for which to calculate pricing.
-     * @param Request $request The incoming request, which may contain manual inputs like compensation.
-     * @return \Illuminate\Http\RedirectResponse Redirects back with a success or error message.
+     * @param  Lot  $lot  The lot for which to calculate pricing.
+     * @param  Request  $request  The incoming request, which may contain manual inputs like compensation.
+     * @return RedirectResponse Redirects back with a success or error message.
      */
     public function calculatePricing(Lot $lot, Request $request)
     {
+        if ($lot->status !== 'accepted') {
+            return redirect()->back()->with('error', 'Only accepted lots can be priced.');
+        }
+
+        if ($lot->payment_blocked || $lot->qc_status === 'Rejected') {
+            return redirect()->back()->with('error', 'Payment is blocked for this lot.');
+        }
+
+        if (! in_array($lot->qc_status, ['Accepted', 'Conditional'], true)) {
+            return redirect()->back()->with('error', 'Quality validation must be completed before pricing.');
+        }
+
         // Prevent recalculation if the pricing has already been approved and locked.
         if ($lot->pricing_approved) {
             return redirect()->back()->with('error', 'Pricing is already approved and locked for this lot.');
         }
 
+        $validated = $request->validate([
+            'compensation_amount' => 'nullable|numeric|min:0',
+        ]);
+
         $agreement = $lot->agreement()->with(['lossRules', 'parameters'])->first();
 
         // --- 1. Base Amount Calculation ---
-        $quantity = $lot->final_quantity ?? $lot->quantity;
-        $basePrice = $agreement->rate ?? 0;
+        $quantity = (float) ($lot->final_quantity ?? $lot->quantity);
+        $basePrice = (float) ($agreement->rate ?? 0);
         $baseAmount = $quantity * $basePrice;
 
         // --- 2. Quality Deduction (based on parameters) ---
         $qualityDeduction = 0;
-        foreach ($agreement->parameters as $parameter) {
-            // Placeholder logic for parameter-based deductions
-            if ($lot->qc_status === 'conditional' && $parameter->name === 'moisture_content' && $lot->moisture_content > $parameter->value) {
-                $qualityDeduction += $baseAmount * 0.02; // Example: 2% deduction for high moisture
-            }
+        if ($lot->qc_status === 'Conditional') {
+            $qualityDeduction = $baseAmount * 0.02;
         }
 
         // --- 3. Bonus & Compensation Input ---
-        $bonusAmount = $agreement->bonus ?? 0;
-        $compensationAmount = $request->input('compensation_amount', 0);
+        $bonusAmount = (float) ($agreement->bonus ?? 0);
+        $compensationAmount = (float) ($validated['compensation_amount'] ?? 0);
 
         // --- 4. Debit Recovery ---
         $debitRecovery = 0;
@@ -79,7 +87,7 @@ class PricingController extends Controller
             // Placeholder logic for loss rule application
             // Example: if loss rule is "weight_loss" and value is "5", deduct 5%
             if (strpos(strtolower($rule->name), 'weight') !== false) {
-                $lossDeduction += $baseAmount * ($rule->value / 100);
+                $lossDeduction += $baseAmount * ((float) $rule->value / 100);
             }
         }
 
@@ -103,7 +111,7 @@ class PricingController extends Controller
             'net_payable' => $netPayable,
         ]);
 
-        return redirect()->back()->with('success', 'Pricing calculated successfully for Lot: ' . $lot->lot_number);
+        return redirect()->back()->with('success', 'Pricing calculated successfully for Lot: '.$lot->lot_number);
     }
 
     /**
@@ -113,11 +121,19 @@ class PricingController extends Controller
      * data for the lot is locked, preventing any further recalculations. This is a critical step
      * before payment can be processed.
      *
-     * @param Lot $lot The lot whose pricing is to be approved.
-     * @return \Illuminate\Http\RedirectResponse
+     * @param  Lot  $lot  The lot whose pricing is to be approved.
+     * @return RedirectResponse
      */
     public function approvePricing(Lot $lot)
     {
+        if ($lot->status !== 'accepted' || $lot->payment_blocked || $lot->qc_status === 'Rejected') {
+            return redirect()->back()->with('error', 'Cannot approve pricing for this lot.');
+        }
+
+        if (is_null($lot->net_payable)) {
+            return redirect()->back()->with('error', 'Calculate pricing before approval.');
+        }
+
         // Lock the pricing data by setting the approval flag and recording the user and timestamp.
         $lot->update([
             'pricing_approved' => true,
@@ -125,7 +141,7 @@ class PricingController extends Controller
             'approved_at' => now(),
         ]);
 
-        return redirect()->back()->with('success', 'Pricing approved and locked for Lot: ' . $lot->lot_number);
+        return redirect()->back()->with('success', 'Pricing approved and locked for Lot: '.$lot->lot_number);
     }
 
     /**
@@ -135,17 +151,23 @@ class PricingController extends Controller
      * for lots with approved pricing. It updates the lot's payment status and creates a corresponding
      * entry in the farmer's ledger to reflect the payment.
      *
-     * @param Lot $lot The lot for which to process payment.
-     * @return \Illuminate\Http\RedirectResponse
+     * @param  Lot  $lot  The lot for which to process payment.
+     * @return RedirectResponse
      */
     public function processPayment(Lot $lot)
     {
         // Ensure pricing is approved and payment has not already been made.
-        if (!$lot->pricing_approved) {
-             return redirect()->back()->with('error', 'Cannot process payment until pricing is approved.');
+        if (! $lot->pricing_approved) {
+            return redirect()->back()->with('error', 'Cannot process payment until pricing is approved.');
+        }
+        if ($lot->status !== 'accepted' || $lot->payment_blocked || $lot->qc_status === 'Rejected') {
+            return redirect()->back()->with('error', 'Cannot process payment for this lot.');
+        }
+        if (is_null($lot->net_payable) || $lot->net_payable < 0) {
+            return redirect()->back()->with('error', 'Cannot process payment without a valid payable amount.');
         }
         if ($lot->payment_status === 'paid') {
-             return redirect()->back()->with('error', 'Payment has already been processed for this lot.');
+            return redirect()->back()->with('error', 'Payment has already been processed for this lot.');
         }
 
         // Use a database transaction to ensure atomicity.
@@ -161,13 +183,13 @@ class PricingController extends Controller
                 'entity_id' => $farmerId,
                 'transaction_type' => 'payment',
                 'amount' => $lot->net_payable,
-                'description' => 'Payment for Lot: ' . $lot->lot_number,
+                'description' => 'Payment for Lot: '.$lot->lot_number,
                 'lot_id' => $lot->id,
             ]);
 
             // Future enhancement: Organizer commission logic could be added here.
         });
 
-        return redirect()->back()->with('success', 'Payment processed and ledgers updated for Lot: ' . $lot->lot_number);
+        return redirect()->back()->with('success', 'Payment processed and ledgers updated for Lot: '.$lot->lot_number);
     }
 }

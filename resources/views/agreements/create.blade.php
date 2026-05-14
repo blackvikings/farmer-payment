@@ -46,13 +46,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="rate">Rate</label>
-                    <input type="text" name="rate" class="form-control" id="rate" value="{{ old('rate') }}" placeholder="Enter Rate">
+                    <label for="rate">Rate *</label>
+                    <input type="number" step="0.01" min="0" name="rate" class="form-control" id="rate" value="{{ old('rate') }}" placeholder="Enter Rate" required>
                 </div>
 
                 <div class="form-group">
                     <label for="bonus">Bonus</label>
-                    <input type="text" name="bonus" class="form-control" id="bonus" value="{{ old('bonus') }}" placeholder="Enter Bonus">
+                    <input type="number" step="0.01" min="0" name="bonus" class="form-control" id="bonus" value="{{ old('bonus') }}" placeholder="Enter Bonus">
                 </div>
 
                 <div class="form-group">
@@ -88,7 +88,7 @@
                 $('#loss_rule_inputs').append(`
                     <div class="input-group mt-2">
                         <input type="text" name="loss_rules[${lossRuleIndex}][name]" class="form-control" placeholder="Enter Loss Rule Name">
-                        <input type="text" name="loss_rules[${lossRuleIndex}][value]" class="form-control" placeholder="Enter Loss Rule Value">
+                        <input type="number" step="0.01" min="0" name="loss_rules[${lossRuleIndex}][value]" class="form-control" placeholder="Enter Loss Rule Value">
                         <div class="input-group-append">
                             <button class="btn btn-danger remove-loss-rule" type="button">Remove</button>
                         </div>
@@ -106,7 +106,7 @@
                 $('#parameter_inputs').append(`
                     <div class="input-group mt-2">
                         <input type="text" name="parameters[${parameterIndex}][name]" class="form-control" placeholder="Enter Parameter Name">
-                        <input type="text" name="parameters[${parameterIndex}][value]" class="form-control" placeholder="Enter Parameter Value">
+                        <input type="number" step="0.01" name="parameters[${parameterIndex}][value]" class="form-control" placeholder="Enter Parameter Value">
                         <div class="input-group-append">
                             <button class="btn btn-danger remove-parameter" type="button">Remove</button>
                         </div>

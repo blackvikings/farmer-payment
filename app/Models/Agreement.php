@@ -20,6 +20,8 @@ class Agreement extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'rate' => 'decimal:2',
+        'bonus' => 'decimal:2',
     ];
 
     public function farmer()

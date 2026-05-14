@@ -31,7 +31,23 @@ class Lot extends Model
         'payment_status',
         'pricing_approved',
         'approved_by',
-        'approved_at'
+        'approved_at',
+    ];
+
+    protected $casts = [
+        'payment_blocked' => 'boolean',
+        'pricing_approved' => 'boolean',
+        'approved_at' => 'datetime',
+        'quantity' => 'decimal:2',
+        'final_quantity' => 'decimal:2',
+        'process_loss' => 'decimal:2',
+        'base_amount' => 'decimal:2',
+        'quality_deduction' => 'decimal:2',
+        'bonus_amount' => 'decimal:2',
+        'compensation_amount' => 'decimal:2',
+        'debit_recovery' => 'decimal:2',
+        'gross_payable' => 'decimal:2',
+        'net_payable' => 'decimal:2',
     ];
 
     public function agreement()

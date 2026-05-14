@@ -2,28 +2,27 @@
 
 namespace App\Observers;
 
-use App\Models\Frn;
-use App\Models\Lot;
-use App\Models\LossRule;
 use App\Models\DebitNote;
-use App\Models\EntryInstruction; // Import the EntryInstruction model
+use App\Models\EntryInstruction;
+use App\Models\Frn;
+use App\Models\LossRule;
+use App\Models\Lot; // Import the EntryInstruction model
 
 class FrnObserver
 {
     /**
      * Handle the Frn "created" event.
      *
-     * @param  \App\Models\Frn  $frn
      * @return void
      */
     public function created(Frn $frn)
     {
         // Auto-create the associated Entry Instruction
         EntryInstruction::create([
-            'frn_id' => $frn->id,
+            'frn_id' => $frn->lot_number,
             'instruction_type' => 'standard_unload', // Default instruction type
             'status' => 'pending', // Default status
-            'details' => 'Standard unloading procedure for lot #' . $frn->lot_number,
+            'details' => 'Standard unloading procedure for lot #'.$frn->lot_number,
         ]);
 
         $this->calculateProcessLoss($frn);
@@ -32,7 +31,6 @@ class FrnObserver
     /**
      * Handle the Frn "updated" event.
      *
-     * @param  \App\Models\Frn  $frn
      * @return void
      */
     public function updated(Frn $frn)
@@ -43,7 +41,6 @@ class FrnObserver
     /**
      * Calculate process loss and create a debit note if necessary.
      *
-     * @param  \App\Models\Frn  $frn
      * @return void
      */
     protected function calculateProcessLoss(Frn $frn)
@@ -51,7 +48,7 @@ class FrnObserver
         $lot = $frn->lot;
 
         // Ensure we have initial quantity and gross weight to calculate loss
-        if (!$lot || is_null($lot->quantity) || is_null($frn->gross_weight)) {
+        if (! $lot || is_null($lot->quantity) || is_null($frn->gross_weight)) {
             return;
         }
 
@@ -68,12 +65,17 @@ class FrnObserver
         // 2. Apply Loss Rule
         $activeRule = LossRule::where('is_active', true)->first();
         if ($activeRule && $lossPercentage > $activeRule->max_allowable_loss_percentage) {
+            if ($lot->debit_note_id) {
+                $lot->save();
+
+                return;
+            }
 
             // 3. Auto-create Debit Note
             $debitNote = DebitNote::create([
                 'lot_id' => $lot->id,
                 'amount' => $loss - ($initialQuantity * $activeRule->max_allowable_loss_percentage / 100), // The excess loss amount
-                'reason' => 'Process loss of ' . number_format($lossPercentage, 2) . '% exceeded the allowable limit of ' . $activeRule->max_allowable_loss_percentage . '%.',
+                'reason' => 'Process loss of '.number_format($lossPercentage, 2).'% exceeded the allowable limit of '.$activeRule->max_allowable_loss_percentage.'%.',
                 'is_approved' => false, // Default to not approved
             ]);
 

@@ -15,6 +15,10 @@ class AgreementLossRule extends Model
         'value',
     ];
 
+    protected $casts = [
+        'value' => 'decimal:2',
+    ];
+
     public function agreement()
     {
         return $this->belongsTo(Agreement::class);
